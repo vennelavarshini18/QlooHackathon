@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { definedTags } from 'nexus/src/app/data/tags.js';
+import { definedTags } from '../../data/tags';
 
 // Initialize the Google Generative AI client with the API key
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
