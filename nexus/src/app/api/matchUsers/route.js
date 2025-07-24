@@ -1,6 +1,5 @@
 import { matchUsers } from '@/lib/matcher';
-
-let userProfiles = []; // Import same object or move to DB later
+import { userProfiles } from '@/lib/dataStore';
 
 export async function POST(req) {
   const { userId } = await req.json();
@@ -12,4 +11,17 @@ export async function POST(req) {
 
   const matches = matchUsers(currentUser, userProfiles);
   return Response.json({ matches });
+}
+
+//GET endpoint to return match results for all users
+export async function GET() {
+  const allMatches = userProfiles.map(user => {
+    const matches = matchUsers(user, userProfiles);
+    return {
+      userId: user.userId,
+      matches
+    };
+  });
+
+  return Response.json(allMatches);
 }

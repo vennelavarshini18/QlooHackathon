@@ -1,4 +1,5 @@
-let userProfiles = []; // (In-memory for now. Replace with DB later)
+import { userProfiles } from '@/lib/dataStore';
+
 
 export async function POST(req) {
   const body = await req.json();

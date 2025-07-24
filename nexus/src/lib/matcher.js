@@ -1,15 +1,38 @@
+function countOverlap(arr1 = [], arr2 = []) {
+  return arr1.filter(item => arr2.includes(item)).length;
+}
+
 export function matchUsers(currentUser, allProfiles) {
-  const scores = [];
+  const matches = [];
 
   for (const user of allProfiles) {
     if (user.userId === currentUser.userId) continue;
 
+    //Match based on tags
     const commonTags = user.tags.filter(tag => currentUser.tags.includes(tag));
-    const score = commonTags.length;
+    let score = commonTags.length;
 
-    scores.push({ userId: user.userId, score, commonTags });
+    //Match based on Qloo keywords
+    const qlooCategories = ['music', 'movies', 'books', 'concepts'];
+    const keywordOverlap = {};
+
+    for (const category of qlooCategories) {
+      const currentList = currentUser.qloo_keywords?.[category] || [];
+      const otherList = user.qloo_keywords?.[category] || [];
+
+      const overlap = countOverlap(currentList, otherList);
+      score += overlap; //Add to total score
+      keywordOverlap[category] = overlap;
+    }
+
+    matches.push({
+      userId: user.userId,
+      score,
+      commonTags,
+      keywordOverlap
+    });
   }
 
-  // Sort by score descending
-  return scores.sort((a, b) => b.score - a.score);
+  //Sort by best match(descending score)
+  return matches.sort((a, b) => b.score - a.score);
 }
