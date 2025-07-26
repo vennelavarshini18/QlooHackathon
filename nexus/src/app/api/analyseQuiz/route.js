@@ -17,25 +17,33 @@ export async function POST(request) {
     }
 
     const prompt = `
-You are an expert profile analyzer. Based on a user's quiz answers, your job is to perform two tasks:
-1. Assign personality tags.
-2. Extract keywords suitable for the Qloo API, which finds recommendations based on taste in media and culture.
+      You are an expert profile analyzer. Based on a user's quiz answers, your job is to perform two tasks:
+      1. Assign personality tags.
+      2. Extract keywords suitable for the Qloo API, which finds recommendations based on taste in media and culture.
 
-The user's quiz answers provided these self-descriptions: "${answers.join(', ')}".
+      The user's quiz answers provided these self-descriptions: "${answers.join(', ')}".
 
-Based on these answers, generate a single, valid JSON object that contains two keys: "tags" and "qloo_keywords".
+      Based on these answers, generate a single, valid JSON object that contains two keys: "tags" and "qloo_keywords".
 
-- The "tags" key should contain an array of exactly 3 strings, selected ONLY from this list: ${definedTags.join(', ')}.
-- The "qloo_keywords" key should contain an object with keys like "music", "movies", "books", or "concepts". The values should be an array of strings extracted or inferred from the user's answers. These keywords should be things Qloo can search for (e.g., artist names, movie titles, genres, authors, philosophical ideas).
+      - The "tags" key should contain an array of exactly 3 strings, selected ONLY from this list: ${definedTags.join(', ')}.
+      - The "qloo_keywords" key should contain an object with keys like "music", "movies", "books", or "concepts". The values should be an array of strings extracted or inferred from the user's answers. These keywords should be things Qloo can search for (e.g., artist names, movie titles, genres, authors, philosophical ideas).
 
-Output only the JSON object. Do not include extra explanation or markdown formatting.
-`;
+      Example:
+      {
+        "tags": ["🎨 Creative", "🎵 Music-Driven", "🧩 Deep Thinker"],
+        "qloo_keywords": {
+          "music": ["Taylor Swift", "Coldplay"],
+          "movies": ["Studio Ghibli"],
+          "concepts": ["Time travel"]
+        }
+      }
+    `;
 
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const result = await model.generateContent(prompt);
     const rawText = result.response.text();
 
-    const jsonMatch = rawText.match(/```json([\s\S]*?)```/) || rawText.match(/```([\s\S]*?)```/);
+    const jsonMatch = rawText.match(/```json([\s\S]*?)```/);
     const jsonString = jsonMatch ? jsonMatch[1].trim() : rawText.trim();
 
     let analysisResult;
@@ -48,27 +56,50 @@ Output only the JSON object. Do not include extra explanation or markdown format
 
     const { tags, qloo_keywords } = analysisResult;
 
-    if (!tags || !Array.isArray(tags) || tags.length !== 3 || !qloo_keywords) {
+    if (!tags || !qloo_keywords || typeof qloo_keywords !== 'object') {
       return NextResponse.json({ error: 'Missing or invalid tags or qloo_keywords in Gemini output' }, { status: 500 });
     }
 
-    // Call Qloo API
-    const qlooResponse = await fetch('https://api.qloo.com/v1/taste/recommendations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'a-api-key': qlooApiKey
-      },
-      body: JSON.stringify(qloo_keywords),
-    });
+    const categories = ["music", "movies", "books", "concepts"];
+    const qlooRecommendations = {};
 
-    const qlooData = await qlooResponse.json();
-    console.log('🔍 Qloo API result:', qlooData);
+    for (const category of categories) {
+      if (Array.isArray(qloo_keywords[category]) && qloo_keywords[category].length > 0) {
+        const items = qloo_keywords[category].map((keyword) => ({
+          type: category,
+          value: keyword
+        }));
+
+        const response = await fetch('https://hackathon.api.qloo.com/v2/insights', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': qlooApiKey
+          },
+          body: JSON.stringify({
+            filter: { type: category },
+            taste: { items }
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          qlooRecommendations[category] = data;
+        } else {
+          console.error(`❌ Qloo API error for ${category}:`, data);
+          qlooRecommendations[category] = {
+            error: true,
+            message: data?.errors?.[0]?.message || 'Unknown error'
+          };
+        }
+      }
+    }
 
     return NextResponse.json({
       tags,
       qloo_keywords,
-      qloo_recommendations: qlooData
+      qloo_recommendations: qlooRecommendations
     });
 
   } catch (error) {
