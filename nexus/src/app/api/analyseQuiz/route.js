@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { definedTags } from '../../data/tags';
+import { definedTags } from '../../../data/tags';
 
 const qlooApiKey = process.env.QLOO_API_KEY;
 const googleApiKey = process.env.GOOGLE_API_KEY;
